@@ -1,0 +1,2500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fanzine Directo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Arial&family=Times+New+Roman&family=Courier+New&family=Georgia&family=Verdana&family=Impact&family=Comic+Sans+MS&family=Trebuchet+MS&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --page-width: 210mm;
+            --page-height: 297mm;
+        }
+        body { 
+            margin: 0; 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #f5f5f5; 
+            touch-action: none;
+            user-select: none;
+            overflow: hidden;
+        }
+        .header { 
+            background: var(--dark); 
+            color: white; 
+            padding: 6px 18px; 
+            display: flex; 
+            font-size: 20px;
+            justify-content: space-between;
+            align-items: center;
+            
+        }
+        
+        .header button { 
+            background: white; 
+            border: none; 
+            font-size: 16px; 
+            padding: 6px; 
+            cursor: pointer; 
+            border-radius: 4px;
+            transition: background 0.2s;
+            margin-right: 9px;
+            
+        }
+        .toolbar { 
+            display: flex; 
+            gap: 16px; 
+            padding: 6px; 
+            background: white; 
+            justify-content: center; 
+            border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
+        }
+        .toolbar button { 
+            background: none; 
+            border: none; 
+            font-size: 19px; 
+            padding: 6px; 
+            cursor: pointer; 
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .toolbar button:hover { 
+            background: var(--light); 
+        }
+        .toolbar button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .page-container { 
+            flex: 1; 
+            overflow: auto; 
+            padding: 0px 99px;
+            display: flex; 
+            justify-content: center; 
+            background: #e0e0e0;
+            align-items: flex-start;
+        }
+        .page { 
+            width: var(--page-width); 
+            height: var(--page-height); 
+            background: white; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            position: relative;
+            transform-origin: top left;
+            margin: 0 auto;
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .element { 
+            position: absolute; 
+            min-width: 20px; 
+            min-height: 20px; 
+            border: 1px dashed transparent;
+            cursor: move;
+            box-sizing: border-box;
+            transform-origin: center;
+        }
+        .element.selected { 
+            border-color: var(--primary); 
+            box-shadow: 0 0 0 2px var(--primary); 
+        }
+        .element[data-has-border="true"] {
+            padding: 5px;
+        }
+        .handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border: 2px solid white;
+            border-radius: 50%;
+            z-index: 10;
+        }
+        .resize-handle {
+            cursor: nwse-resize;
+        }
+        .rotate-handle {
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%233498db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M1 4v6h6'></path><path d='M3.51 15a9 9 0 1 0 2.13-9.36L1 10'></path></svg>") 8 8, pointer;
+            background: #f1c40f;
+        }
+        .resize-handle.bottom-right {
+            right: -6px;
+            bottom: -6px;
+        }
+        .resize-handle.bottom-left {
+            left: -6px;
+            bottom: -6px;
+        }
+        .resize-handle.top-right {
+            right: -6px;
+            top: -6px;
+        }
+        .resize-handle.top-left {
+            left: -6px;
+            top: -6px;
+        }
+        .rotate-handle.top-center {
+            top: -20px;
+            left: 50%;
+            margin-left: -6px;
+        }
+        .edit-panel {
+            position: fixed;
+            bottom: 45px;
+            left: 22%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 28px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .edit-panel.visible { opacity: 1; }
+        .compact-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 55%;
+            width: 280px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+        }
+        .compact-modal.active { display: block; }
+        .modal-header { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 8px; 
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+            padding-top: 5px;
+            z-index: 10;
+        }
+        .modal-close { 
+            background: none; 
+            border: none; 
+            font-size: 18px; 
+            cursor: pointer; 
+            padding: 0;
+            line-height: 1;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+        .form-row { 
+            margin-bottom: 6px; 
+        }
+        .form-row label { 
+            display: block;
+            font-size: 11px;
+            margin-bottom: 2px;
+            color: #555;
+        }
+        .form-row input, 
+        .form-row select,
+        .form-row textarea { 
+            width: 100%;
+            padding: 5px; 
+            border: 1px solid #ddd; 
+            border-radius: 3px; 
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        .form-row input[type="color"] {
+            height: 25px;
+            padding: 1px;
+            cursor: pointer;
+        }
+        .form-row input[type="range"] {
+            padding: 0;
+            width: calc(100% - 35px);
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .range-value {
+            display: inline-block;
+            width: 30px;
+            text-align: center;
+            font-size: 11px;
+            margin-left: 3px;
+        }
+        .modal-actions { 
+            display: flex; 
+            justify-content: flex-end; 
+            gap: 6px; 
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding-bottom: 3px;
+        }
+        .btn { 
+            padding: 5px 10px; 
+            border-radius: 3px; 
+            cursor: pointer; 
+            font-size: 12px;
+            border: 1px solid #ddd;
+            transition: all 0.2s;
+        }
+        .btn-primary { 
+            background: var(--primary); 
+            color: white; 
+            border-color: var(--primary);
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+            border-color: #2980b9;
+        }
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 5;
+        }
+        .tab-button {
+            padding: 6px 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-button.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            padding: 3px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .text-content {
+            width: 100%;
+            height: 100%;
+            opacity: 1;
+            outline: none;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .page-view {
+            transform: scale(0.8);
+            transform-origin: top center;
+            margin: 20px 0;
+        }
+        .zoom-controls {
+            position: fixed;
+            right: 15px;
+            bottom: 45px;
+            display: flex;
+            flex-direction: file;
+            gap: 5px;
+            z-index: 50;
+        }
+        .zoom-controls button {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: white;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--dark);
+            color: white;
+            padding: 4px 8px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .page-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            margin-left: 10px;
+        }
+        .page-controls button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .page-controls button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .page-indicator {
+            font-size: 12px;
+            margin: 10 5px;
+        }
+        .filter-grayscale {
+            filter: grayscale(100%);
+        }
+        .filter-sepia {
+            filter: sepia(100%);
+        }
+        .filter-invert {
+            filter: invert(100%);
+        }
+        .filter-saturate {
+            filter: saturate(200%);
+        }
+        .filter-none {
+            filter: none;
+        }
+        .pinned {
+            outline: 2px dashed #2ecc71;
+        }
+        .pinned .handle {
+            display: none !important;
+        }
+
+        /* Definiciones de clases de fuentes */
+        .font-arial { font-family: 'Arial', sans-serif; }
+        .font-times { font-family: 'Times New Roman', serif; }
+        .font-courier { font-family: 'Courier New', monospace; }
+        .font-georgia { font-family: 'Georgia', serif; }
+        .font-verdana { font-family: 'Verdana', sans-serif; }
+        .font-impact { font-family: 'Impact', sans-serif; }
+        .font-comic { font-family: 'Comic Sans MS', cursive; }
+        .font-trebuchet { font-family: 'Trebuchet MS', sans-serif; }
+
+        /* Estilos para el modal de proyectos */
+        .project-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .project-item:last-child {
+            border-bottom: none;
+        }
+        .project-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .project-actions button {
+            padding: 3px 6px;
+            min-width: 30px;
+        }
+
+        /* Estilos para las guías de alineación */
+        .alignment-guide {
+            position: absolute;
+            background: var(--primary);
+            z-index: 9998;
+            pointer-events: none;
+        }
+        .alignment-guide.horizontal {
+            height: 1px;
+            width: 100%;
+            left: 0;
+        }
+        .alignment-guide.vertical {
+            width: 1px;
+            height: 100%;
+            top: 0;
+        }
+        .alignment-guide.center {
+            background: #e74c3c;
+        }
+        
+        /* Estilo para elementos que están siendo alineados */
+        .element.snapping {
+            outline: 2px dashed var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .page-view {
+                transform: scale(0.6);
+            }
+            .compact-modal {
+                width: 95%;
+                padding: 8px;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div id="projectName">Fanzine Directo</div>
+        <div>
+            <button id="newBtn" title="Nuevo"><i class="fas fa-file"></i></button>
+            <button id="saveBtn" title="Guardar"><i class="fas fa-save"></i></button>
+            <button id="exportBtn" title="Exportar a PDF"><i class="fas fa-file-export"></i></button>
+        </div>
+    </div>
+
+    <div class="main-container" style="display: flex; flex-direction: column; height: calc(100vh - 50px);">
+        <div class="toolbar">
+            <button id="addTextBtn" title="Texto"><i class="fas fa-font"></i></button>
+            <button id="addImageBtn" title="Imagen"><i class="fas fa-image"></i></button>
+            <button id="addPageBtn" title="Añadir página"><i class="fas fa-plus"></i></button>
+            <button id="copyPageBtn" title="Copiar página"><i class="fas fa-copy"></i></button>
+            <button id="pastePageBtn" title="Pegar página" disabled><i class="fas fa-paste"></i></button>
+            <button id="editBtn" title="Propiedades" disabled><i class="fas fa-sliders-h"></i></button>
+            <button id="deleteBtn" title="Eliminar" disabled><i class="fas fa-trash"></i></button>
+            <button id="gridBtn" title="Mostrar cuadrícula"><i class="fas fa-border-all"></i></button>
+        </div>
+
+        <div class="page-container">
+            <div id="pagesContainer"></div>
+        </div>
+    </div>
+
+    <!-- Panel de edición contextual -->
+    <div class="edit-panel" id="editPanel">
+        <button id="bringForwardBtn" title="Traer adelante"><i class="fas fa-layer-plus"></i></button>
+        <button id="sendBackwardBtn" title="Enviar atrás"><i class="fas fa-layer-minus"></i></button>
+        <button id="duplicateBtn" title="Duplicar"><i class="fas fa-copy"></i></button>
+        <button id="pinBtn" title="Anclar elemento"><i class="fas fa-thumbtack"></i></button>
+    </div>
+
+    <!-- Controles de zoom -->
+    <div class="zoom-controls">
+        <button id="zoomInBtn" title="Acercar"><i class="fas fa-search-plus"></i></button>
+        <button id="zoomOutBtn" title="Alejar"><i class="fas fa-search-minus"></i></button>
+        <button id="zoomResetBtn" title="Tamaño real"><i class="fas fa-search"></i></button>
+    </div>
+
+    <!-- Barra de estado -->
+    <div class="status-bar">
+        <div class="page-controls">
+            <button id="prevPageBtn"><i class="fas fa-chevron-left"></i></button>
+            <span class="page-indicator" id="pageIndicator">Página 1 de 1</span>
+            <button id="nextPageBtn"><i class="fas fa-chevron-right"></i></button>
+            <button id="deletePageBtn" title="Eliminar página"><i class="fas fa-trash"></i></button>
+        </div>
+        <div id="cursorPosition">X: 0, Y: 0</div>
+        <div id="zoomLevel">Zoom: 80%</div>
+    </div>
+
+    <!-- Modal de propiedades -->
+    <div class="compact-modal" id="propsModal">
+        <div class="modal-header">
+            <h3 style="margin: 0; font-size: 14px;">Propiedades</h3>
+            <button class="modal-close" id="closePropsModal">&times;</button>
+        </div>
+        
+        <div class="tab-buttons">
+            <button class="tab-button active" data-tab="style">Estilo</button>
+            <button class="tab-button" data-tab="content">Contenido</button>
+            <button class="tab-button" data-tab="filters">Filtros</button>
+        </div>
+        
+        <div id="propsContent">
+            <!-- Contenido dinámico según el elemento -->
+        </div>
+        <div class="modal-actions">
+            <button class="btn" id="cancelProps">Cancelar</button>
+            <button class="btn btn-primary" id="saveProps">Aplicar</button>
+        </div>
+    </div>
+
+    <!-- Modal para guardar/cargar proyectos -->
+    <div class="compact-modal" id="projectModal">
+        <div class="modal-header">
+            <h3 style="margin: 0; font-size: 14px;">Administrar Proyectos</h3>
+            <button class="modal-close" id="closeProjectModal">&times;</button>
+        </div>
+        
+        <div class="tab-buttons">
+            <button class="tab-button active" data-tab="save">Guardar</button>
+            <button class="tab-button" data-tab="load">Cargar</button>
+        </div>
+        
+        <div id="projectContent">
+            <div class="tab-content active" data-tab-content="save">
+                <div class="form-row">
+                    <label>Nombre del proyecto</label>
+                    <input type="text" id="projectNameInput" value="Mi Fanzine">
+                </div>
+                <div class="form-row">
+                    <button id="saveProjectBtn" class="btn btn-primary" style="width: 100%;">Guardar Proyecto</button>
+                </div>
+            </div>
+            
+            <div class="tab-content" data-tab-content="load">
+                <div id="savedProjectsList" style="max-height: 200px; overflow-y: auto;">
+                    <!-- Lista de proyectos se llenará dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        let currentProject = {
+            name: "Fanzine Directo",
+            pages: [{ id: 'page-1', elements: [] }],
+            currentPageIndex: 0,
+            showGrid: false
+        };
+        let selectedElement = null;
+        let zIndexCounter = 1;
+        let isDragging = false;
+        let isResizing = false;
+        let isRotating = false;
+        let resizeHandle = null;
+        let startX, startY, startWidth, startHeight, startLeft, startTop, startAngle;
+        let currentZoom = 0.8;
+        let gridEnabled = false;
+        let copiedPage = null;
+        let copiedPageIndex = -1;
+        let alignmentGuides = [];
+        let isSnapping = false;
+
+        // Lista de fuentes disponibles usando clases CSS
+        const availableFonts = [
+            { name: 'Arial', value: 'font-arial' },
+            { name: 'Times New Roman', value: 'font-times' },
+            { name: 'Courier New', value: 'font-courier' },
+            { name: 'Georgia', value: 'font-georgia' },
+            { name: 'Verdana', value: 'font-verdana' },
+            { name: 'Impact', value: 'font-impact' },
+            { name: 'Comic Sans', value: 'font-comic' },
+            { name: 'Trebuchet MS', value: 'font-trebuchet' }
+        ];
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            setupPages();
+            updateUI();
+        });
+
+        function setupEventListeners() {
+            // Botones principales
+            document.getElementById('addTextBtn').addEventListener('click', addTextElement);
+            document.getElementById('addImageBtn').addEventListener('click', addImageElement);
+            document.getElementById('addPageBtn').addEventListener('click', addNewPage);
+            document.getElementById('copyPageBtn').addEventListener('click', copyCurrentPage);
+            document.getElementById('pastePageBtn').addEventListener('click', pastePage);
+            document.getElementById('editBtn').addEventListener('click', showPropsModal);
+            document.getElementById('exportBtn').addEventListener('click', exportToPDF);
+            document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
+            document.getElementById('newBtn').addEventListener('click', newProject);
+            document.getElementById('saveBtn').addEventListener('click', saveProject);
+            document.getElementById('gridBtn').addEventListener('click', toggleGrid);
+            
+            // Navegación de páginas
+            document.getElementById('prevPageBtn').addEventListener('click', goToPrevPage);
+            document.getElementById('nextPageBtn').addEventListener('click', goToNextPage);
+            document.getElementById('deletePageBtn').addEventListener('click', deleteCurrentPage);
+            
+            // Panel de edición
+            document.getElementById('bringForwardBtn').addEventListener('click', bringForward);
+            document.getElementById('sendBackwardBtn').addEventListener('click', sendBackward);
+            document.getElementById('duplicateBtn').addEventListener('click', duplicateElement);
+            document.getElementById('pinBtn').addEventListener('click', togglePinElement);
+            
+            // Controles de zoom
+            document.getElementById('zoomInBtn').addEventListener('click', () => adjustZoom(0.1));
+            document.getElementById('zoomOutBtn').addEventListener('click', () => adjustZoom(-0.1));
+            document.getElementById('zoomResetBtn').addEventListener('click', () => setZoom(0.45));
+            
+            // Modal de propiedades
+            document.getElementById('closePropsModal').addEventListener('click', hidePropsModal);
+            document.getElementById('cancelProps').addEventListener('click', hidePropsModal);
+            document.getElementById('saveProps').addEventListener('click', saveProps);
+            
+            // Modal de proyectos
+            document.getElementById('closeProjectModal').addEventListener('click', () => {
+                document.getElementById('projectModal').classList.remove('active');
+            });
+            document.getElementById('saveProjectBtn').addEventListener('click', saveProjectToStorage);
+            
+            // Tabs del modal
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.dataset.tab;
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                        if (content.dataset.tabContent === tabName) {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+            
+            // Actualizar lista de proyectos cuando se abre la pestaña de carga
+            document.querySelector('.tab-button[data-tab="load"]').addEventListener('click', updateSavedProjectsList);
+            
+            // Permitir guardar con Enter en el campo de nombre
+            document.getElementById('projectNameInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    saveProjectToStorage();
+                }
+            });
+            
+            // Seguimiento del cursor
+            document.getElementById('pagesContainer').addEventListener('mousemove', (e) => {
+                const activePage = document.querySelector('.page.active');
+                if (!activePage) return;
+                
+                const rect = activePage.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / currentZoom;
+                const y = (e.clientY - rect.top) / currentZoom;
+                document.getElementById('cursorPosition').textContent = `X: ${Math.round(x)}, Y: ${Math.round(y)}`;
+            });
+
+            // Permitir desplazamiento con rueda del ratón
+            document.getElementById('pagesContainer').addEventListener('wheel', (e) => {
+                e.preventDefault();
+                document.getElementById('pagesContainer').scrollBy({
+                    left: e.deltaY < 0 ? -30 : 30,
+                    top: e.deltaY < 0 ? -30 : 30,
+                    behavior: 'smooth'
+                });
+            });
+        }
+
+        function setupPages() {
+            const container = document.getElementById('pagesContainer');
+            container.innerHTML = '';
+            
+            currentProject.pages.forEach((page, index) => {
+                const pageElement = document.createElement('div');
+                pageElement.className = 'page page-view';
+                pageElement.id = page.id;
+                pageElement.dataset.pageIndex = index;
+                
+                // Tamaño DIN A4 en píxeles (210mm x 297mm)
+                const mmToPx = 3.78; // Factor de conversión aproximado
+                pageElement.style.width = `${210 * mmToPx}px`;
+                pageElement.style.height = `${297 * mmToPx}px`;
+                
+                container.appendChild(pageElement);
+            });
+            
+            showPage(currentProject.currentPageIndex);
+            updateGrid();
+            updatePageIndicator();
+        }
+
+        function showPage(index) {
+            document.querySelectorAll('.page').forEach((page, i) => {
+                if (i === index) {
+                    page.classList.add('active');
+                } else {
+                    page.classList.remove('active');
+                }
+            });
+            
+            currentProject.currentPageIndex = index;
+            updatePageIndicator();
+            deselectAll();
+        }
+
+        function addNewPage() {
+            const newPageId = `page-${Date.now()}`;
+            currentProject.pages.push({ id: newPageId, elements: [] });
+            
+            const pageElement = document.createElement('div');
+            pageElement.className = 'page page-view';
+            pageElement.id = newPageId;
+            pageElement.dataset.pageIndex = currentProject.pages.length - 1;
+            
+            const mmToPx = 3.78;
+            pageElement.style.width = `${210 * mmToPx}px`;
+            pageElement.style.height = `${297 * mmToPx}px`;
+            
+            document.getElementById('pagesContainer').appendChild(pageElement);
+            showPage(currentProject.pages.length - 1);
+        }
+
+        function deleteCurrentPage() {
+            if (currentProject.pages.length <= 1) {
+                alert("No puedes eliminar la única página del proyecto");
+                return;
+            }
+            
+            if (confirm("¿Eliminar esta página? Todos sus elementos se perderán.")) {
+                const pageId = currentProject.pages[currentProject.currentPageIndex].id;
+                currentProject.pages.splice(currentProject.currentPageIndex, 1);
+                
+                // Ajustar el índice si era la última página
+                if (currentProject.currentPageIndex >= currentProject.pages.length) {
+                    currentProject.currentPageIndex = currentProject.pages.length - 1;
+                }
+                
+                document.getElementById(pageId)?.remove();
+                showPage(currentProject.currentPageIndex);
+            }
+        }
+
+        function goToPrevPage() {
+            if (currentProject.currentPageIndex > 0) {
+                showPage(currentProject.currentPageIndex - 1);
+            }
+        }
+
+        function goToNextPage() {
+            if (currentProject.currentPageIndex < currentProject.pages.length - 1) {
+                showPage(currentProject.currentPageIndex + 1);
+            }
+        }
+
+        function updatePageIndicator() {
+            document.getElementById('pageIndicator').textContent = 
+                `Página ${currentProject.currentPageIndex + 1} de ${currentProject.pages.length}`;
+        }
+
+        function adjustZoom(amount) {
+            setZoom(currentZoom + amount);
+        }
+
+        function setZoom(zoomLevel) {
+            zoomLevel = Math.max(0.3, Math.min(1.5, zoomLevel));
+            currentZoom = zoomLevel;
+            document.querySelectorAll('.page-view').forEach(page => {
+                page.style.transform = `scale(${zoomLevel})`;
+            });
+            document.getElementById('zoomLevel').textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+        }
+
+        function toggleGrid() {
+            gridEnabled = !gridEnabled;
+            updateGrid();
+            updateUI();
+        }
+
+        function updateGrid() {
+            document.querySelectorAll('.page').forEach(page => {
+                if (gridEnabled) {
+                    page.style.backgroundImage = 'linear-gradient(#ddd 1px, transparent 1px), linear-gradient(90deg, #ddd 1px, transparent 1px)';
+                    page.style.backgroundSize = '20px 20px';
+                } else {
+                    page.style.backgroundImage = 'none';
+                }
+            });
+        }
+
+        function updateUI() {
+            const hasSelection = selectedElement !== null;
+            document.getElementById('editBtn').disabled = !hasSelection;
+            document.getElementById('deleteBtn').disabled = !hasSelection;
+            document.getElementById('pastePageBtn').disabled = copiedPage === null;
+            document.getElementById('gridBtn').innerHTML = gridEnabled ? 
+                '<i class="fas fa-border-none"></i>' : '<i class="fas fa-border-all"></i>';
+            
+            if (hasSelection) {
+                const isPinned = selectedElement.classList.contains('pinned');
+                document.getElementById('pinBtn').innerHTML = isPinned ? 
+                    '<i class="fas fa-thumbtack" style="color: #2ecc71;"></i>' : '<i class="fas fa-thumbtack"></i>';
+            }
+        }
+
+        function getCurrentPageElement() {
+            return document.querySelector(`.page[data-page-index="${currentProject.currentPageIndex}"]`);
+        }
+
+        function addTextElement() {
+            const page = getCurrentPageElement();
+            if (!page) return;
+            
+            const element = document.createElement('div');
+            element.className = 'element';
+            element.style.cssText = `
+                top: 50px; left: 50px; width: 150px; height: 100px;
+                padding: 8px; background: rgba(255,255,255,0.9);
+                z-index: ${zIndexCounter++};
+            `;
+            element.dataset.type = 'text';
+            element.dataset.rotation = '0';
+            element.dataset.hasBorder = "false";
+            
+            const textContent = document.createElement('div');
+            textContent.className = 'text-content font-arial'; // Fuente predeterminada
+            textContent.contentEditable = true;
+            textContent.textContent = "Haz clic para editar";
+            textContent.style.cssText = `
+                font-size: 14px;
+                width: 100%;
+                height: 100%;
+                opacity: 1;
+                color: #000000;
+            `;
+            
+            element.appendChild(textContent);
+            setupElement(element);
+            page.appendChild(element);
+            selectElement(element);
+            
+            setTimeout(() => {
+                textContent.focus();
+            }, 100);
+        }
+
+        function addImageElement() {
+            const page = getCurrentPageElement();
+            if (!page) return;
+            
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const element = document.createElement('div');
+                    element.className = 'element';
+                    element.style.cssText = `
+                        top: 50px; left: 50px; width: 150px; height: 150px;
+                        z-index: ${zIndexCounter++}; 
+                        display: flex; align-items: center; justify-content: center;
+                        position: absolute;
+                        overflow: visible;
+                    `;
+                    element.dataset.type = 'image';
+                    element.dataset.rotation = '0';
+                    element.dataset.filter = 'none';
+                    element.dataset.hasBorder = "false";
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '100%';
+                    img.style.objectFit = 'contain';
+                    
+                    element.appendChild(img);
+                    setupElement(element);
+                    page.appendChild(element);
+                    selectElement(element);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            input.click();
+        }
+
+        function setupElement(element) {
+            addResizeHandles(element);
+            addRotateHandle(element);
+            
+            // Evento para seleccionar (mouse)
+            element.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('handle')) return;
+                e.stopPropagation();
+                selectElement(element);
+                
+                // Solo permitir arrastre si no está anclado
+                if (!element.classList.contains('pinned')) {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startLeft = parseInt(element.style.left) || 0;
+                    startTop = parseInt(element.style.top) || 0;
+                    document.addEventListener('mousemove', handleDrag);
+                    document.addEventListener('mouseup', stopDrag);
+                }
+            });
+
+            // Evento para seleccionar (touch)
+            element.addEventListener('touchstart', (e) => {
+                if (e.target.classList.contains('handle')) return;
+                if (e.cancelable) e.preventDefault();
+                e.stopPropagation();
+                selectElement(element);
+                
+                // Solo permitir arrastre si no está anclado
+                if (!element.classList.contains('pinned')) {
+                    const touch = e.touches[0];
+                    isDragging = true;
+                    startX = touch.clientX;
+                    startY = touch.clientY;
+                    startLeft = parseInt(element.style.left) || 0;
+                    startTop = parseInt(element.style.top) || 0;
+                    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    document.addEventListener('touchend', stopDrag);
+                }
+            });
+        }
+
+        function addResizeHandles(element) {
+            const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+            
+            positions.forEach(pos => {
+                const handle = document.createElement('div');
+                handle.className = `handle resize-handle ${pos}`;
+                
+                // Evento para redimensionar (mouse)
+                handle.addEventListener('mousedown', (e) => {
+                    if (element.classList.contains('pinned')) return;
+                    e.stopPropagation();
+                    isResizing = true;
+                    resizeHandle = pos;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = parseInt(element.style.width) || element.offsetWidth;
+                    startHeight = parseInt(element.style.height) || element.offsetHeight;
+                    startLeft = parseInt(element.style.left) || 0;
+                    startTop = parseInt(element.style.top) || 0;
+                    document.addEventListener('mousemove', handleResize);
+                    document.addEventListener('mouseup', stopResize);
+                });
+                
+                // Evento para redimensionar (touch)
+                handle.addEventListener('touchstart', (e) => {
+                    if (element.classList.contains('pinned')) return;
+                    if (e.cancelable) e.preventDefault();
+                    e.stopPropagation();
+                    isResizing = true;
+                    resizeHandle = pos;
+                    const touch = e.touches[0];
+                    startX = touch.clientX;
+                    startY = touch.clientY;
+                    startWidth = parseInt(element.style.width) || element.offsetWidth;
+                    startHeight = parseInt(element.style.height) || element.offsetHeight;
+                    startLeft = parseInt(element.style.left) || 0;
+                    startTop = parseInt(element.style.top) || 0;
+                    document.addEventListener('touchmove', handleTouchResize, { passive: false });
+                    document.addEventListener('touchend', stopResize);
+                });
+                
+                element.appendChild(handle);
+            });
+        }
+
+        function addRotateHandle(element) {
+            const handle = document.createElement('div');
+            handle.className = 'handle rotate-handle top-center';
+            
+            // Evento para rotar (mouse)
+            handle.addEventListener('mousedown', (e) => {
+                if (element.classList.contains('pinned')) return;
+                e.stopPropagation();
+                isRotating = true;
+                const rect = element.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+                startAngle -= parseFloat(element.dataset.rotation) || 0;
+                document.addEventListener('mousemove', handleRotate);
+                document.addEventListener('mouseup', stopRotate);
+            });
+            
+            // Evento para rotar (touch)
+            handle.addEventListener('touchstart', (e) => {
+                if (element.classList.contains('pinned')) return;
+                if (e.cancelable) e.preventDefault();
+                e.stopPropagation();
+                isRotating = true;
+                const touch = e.touches[0];
+                const rect = element.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                startAngle = Math.atan2(touch.clientY - centerY, touch.clientX - centerX) * 180 / Math.PI;
+                startAngle -= parseFloat(element.dataset.rotation) || 0;
+                document.addEventListener('touchmove', handleTouchRotate, { passive: false });
+                document.addEventListener('touchend', stopRotate);
+            });
+            
+            element.appendChild(handle);
+        }
+
+        function handleDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const dx = (e.clientX - startX) / currentZoom;
+            const dy = (e.clientY - startY) / currentZoom;
+            
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+            
+            // Verificar alineación con otros elementos y guías
+            const snapInfo = checkSnapping(selectedElement, newLeft, newTop);
+            
+            if (snapInfo.snapped) {
+                newLeft = snapInfo.left;
+                newTop = snapInfo.top;
+                isSnapping = true;
+                selectedElement.classList.add('snapping');
+                showAlignmentGuides(snapInfo.guides);
+            } else {
+                isSnapping = false;
+                selectedElement.classList.remove('snapping');
+                hideAlignmentGuides();
+            }
+            
+            selectedElement.style.left = newLeft + 'px';
+            selectedElement.style.top = newTop + 'px';
+        }
+
+        function handleTouchMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const dx = (touch.clientX - startX) / currentZoom;
+            const dy = (touch.clientY - startY) / currentZoom;
+            
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+            
+            // Verificar alineación con otros elementos y guías
+            const snapInfo = checkSnapping(selectedElement, newLeft, newTop);
+            
+            if (snapInfo.snapped) {
+                newLeft = snapInfo.left;
+                newTop = snapInfo.top;
+                isSnapping = true;
+                selectedElement.classList.add('snapping');
+                showAlignmentGuides(snapInfo.guides);
+            } else {
+                isSnapping = false;
+                selectedElement.classList.remove('snapping');
+                hideAlignmentGuides();
+            }
+            
+            selectedElement.style.left = newLeft + 'px';
+            selectedElement.style.top = newTop + 'px';
+        }
+
+        function checkSnapping(element, newLeft, newTop) {
+            const page = getCurrentPageElement();
+            if (!page) return { snapped: false };
+            
+            const elementRect = {
+                left: newLeft,
+                top: newTop,
+                width: parseInt(element.style.width) || element.offsetWidth,
+                height: parseInt(element.style.height) || element.offsetHeight,
+                right: newLeft + (parseInt(element.style.width) || element.offsetWidth),
+                bottom: newTop + (parseInt(element.style.height) || element.offsetHeight),
+                centerX: newLeft + (parseInt(element.style.width) || element.offsetWidth) / 2,
+                centerY: newTop + (parseInt(element.style.height) || element.offsetHeight) / 2
+            };
+            
+            
+           
+            
+            
+            
+            const pageRect = page.getBoundingClientRect();
+            const pageCenterX = pageRect.width / 0.888;
+            const pageCenterY = pageRect.height / 0.888;
+            
+            const snapThreshold = 5; // Píxeles de tolerancia para el snap
+            const guides = [];
+            
+            
+            let snapped = false;
+            let finalLeft = newLeft;
+            let finalTop = newTop;
+            
+            // Verificar alineación con el centro de la página
+            if (Math.abs(elementRect.centerX - pageCenterX) < snapThreshold) {
+                finalLeft = pageCenterX - elementRect.width / 2;
+                guides.push({ type: 'vertical', position: pageCenterX, isCenter: true });
+                snapped = true;
+            }
+            
+            if (Math.abs(elementRect.centerY - pageCenterY) < snapThreshold) {
+                finalTop = pageCenterY - elementRect.height / 2;
+                guides.push({ type: 'horizontal', position: pageCenterY, isCenter: true });
+                snapped = true;
+            }
+            
+            // Verificar alineación con otros elementos
+            page.querySelectorAll('.element').forEach(otherElement => {
+                if (otherElement === element) return;
+                
+                const otherRect = {
+                    left: parseInt(otherElement.style.left) || 0,
+                    top: parseInt(otherElement.style.top) || 0,
+                    width: parseInt(otherElement.style.width) || otherElement.offsetWidth,
+                    height: parseInt(otherElement.style.height) || otherElement.offsetHeight,
+                    right: (parseInt(otherElement.style.left) || 0) + (parseInt(otherElement.style.width) || otherElement.offsetWidth),
+                    bottom: (parseInt(otherElement.style.top) || 0) + (parseInt(otherElement.style.height) || otherElement.offsetHeight),
+                    centerX: (parseInt(otherElement.style.left) || 0) + (parseInt(otherElement.style.width) || otherElement.offsetWidth) / 2,
+                    centerY: (parseInt(otherElement.style.top) || 0) + (parseInt(otherElement.style.height) || otherElement.offsetHeight) / 2
+                };
+                
+                // Alineación horizontal (mismos tops)
+                if (Math.abs(elementRect.top - otherRect.top) < snapThreshold) {
+                    finalTop = otherRect.top;
+                    guides.push({ type: 'horizontal', position: otherRect.top });
+                    snapped = true;
+                }
+                
+                // Alineación horizontal (mismos bottoms)
+                if (Math.abs(elementRect.bottom - otherRect.bottom) < snapThreshold) {
+                    finalTop = otherRect.bottom - elementRect.height;
+                    guides.push({ type: 'horizontal', position: otherRect.bottom });
+                    snapped = true;
+                }
+                
+                // Alineación horizontal (centros)
+                if (Math.abs(elementRect.centerY - otherRect.centerY) < snapThreshold) {
+                    finalTop = otherRect.centerY - elementRect.height / 2;
+                    guides.push({ type: 'horizontal', position: otherRect.centerY });
+                    snapped = true;
+                }
+                
+                // Alineación vertical (mismos lefts)
+                if (Math.abs(elementRect.left - otherRect.left) < snapThreshold) {
+                    finalLeft = otherRect.left;
+                    guides.push({ type: 'vertical', position: otherRect.left });
+                    snapped = true;
+                }
+                
+                // Alineación vertical (mismos rights)
+                if (Math.abs(elementRect.right - otherRect.right) < snapThreshold) {
+                    finalLeft = otherRect.right - elementRect.width;
+                    guides.push({ type: 'vertical', position: otherRect.right });
+                    snapped = true;
+                }
+                
+                // Alineación vertical (centros)
+                if (Math.abs(elementRect.centerX - otherRect.centerX) < snapThreshold) {
+                    finalLeft = otherRect.centerX - elementRect.width / 2;
+                    guides.push({ type: 'vertical', position: otherRect.centerX });
+                    snapped = true;
+                }
+            });
+            
+            return {
+                snapped,
+                left: finalLeft,
+                top: finalTop,
+                guides
+            };
+        }
+
+        function showAlignmentGuides(guides) {
+            // Limpiar guías anteriores
+            hideAlignmentGuides();
+            
+            const page = getCurrentPageElement();
+            if (!page) return;
+            
+            guides.forEach(guide => {
+                const guideElement = document.createElement('div');
+                guideElement.className = `alignment-guide ${guide.type} ${guide.isCenter ? 'center' : ''}`;
+                
+                if (guide.type === 'horizontal') {
+                    guideElement.style.top = `${guide.position}px`;
+                } else {
+                    guideElement.style.left = `${guide.position}px`;
+                }
+                
+                page.appendChild(guideElement);
+                alignmentGuides.push(guideElement);
+            });
+        }
+
+        function hideAlignmentGuides() {
+            alignmentGuides.forEach(guide => guide.remove());
+            alignmentGuides = [];
+        }
+
+        function handleResize(e) {
+            if (!isResizing) return;
+            e.preventDefault();
+            
+            const dx = (e.clientX - startX) / currentZoom;
+            const dy = (e.clientY - startY) / currentZoom;
+            
+            resizeElement(dx, dy);
+        }
+
+        function handleTouchResize(e) {
+            if (!isResizing) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const dx = (touch.clientX - startX) / currentZoom;
+            const dy = (touch.clientY - startY) / currentZoom;
+            
+            resizeElement(dx, dy);
+        }
+
+        function handleRotate(e) {
+            if (!isRotating) return;
+            e.preventDefault();
+            
+            const rect = selectedElement.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+            const newAngle = angle - startAngle;
+            
+            selectedElement.style.transform = `rotate(${newAngle}deg)`;
+            selectedElement.dataset.rotation = newAngle;
+        }
+
+        function handleTouchRotate(e) {
+            if (!isRotating) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const rect = selectedElement.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const angle = Math.atan2(touch.clientY - centerY, touch.clientX - centerX) * 180 / Math.PI;
+            const newAngle = angle - startAngle;
+            
+            selectedElement.style.transform = `rotate(${newAngle}deg)`;
+            selectedElement.dataset.rotation = newAngle;
+        }
+
+        function resizeElement(dx, dy) {
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newLeft = startLeft;
+            let newTop = startTop;
+            
+            if (resizeHandle.includes('right')) {
+                newWidth = startWidth + dx;
+            } else if (resizeHandle.includes('left')) {
+                newWidth = startWidth - dx;
+                newLeft = startLeft + dx;
+            }
+            
+            if (resizeHandle.includes('bottom')) {
+                newHeight = startHeight + dy;
+            } else if (resizeHandle.includes('top')) {
+                newHeight = startHeight - dy;
+                newTop = startTop + dy;
+            }
+            
+            newWidth = Math.max(20, newWidth);
+            newHeight = Math.max(20, newHeight);
+            
+            selectedElement.style.width = newWidth + 'px';
+            selectedElement.style.height = newHeight + 'px';
+            selectedElement.style.left = newLeft + 'px';
+            selectedElement.style.top = newTop + 'px';
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchmove', handleTouchMove);
+            document.removeEventListener('touchend', stopDrag);
+            
+            if (isSnapping) {
+                setTimeout(() => {
+                    selectedElement.classList.remove('snapping');
+                    hideAlignmentGuides();
+                }, 300);
+            }
+        }
+
+        function stopResize() {
+            isResizing = false;
+            resizeHandle = null;
+            document.removeEventListener('mousemove', handleResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.removeEventListener('touchmove', handleTouchResize);
+            document.removeEventListener('touchend', stopResize);
+        }
+
+        function stopRotate() {
+            isRotating = false;
+            document.removeEventListener('mousemove', handleRotate);
+            document.removeEventListener('mouseup', stopRotate);
+            document.removeEventListener('touchmove', handleTouchRotate);
+            document.removeEventListener('touchend', stopRotate);
+        }
+
+        function selectElement(element) {
+            deselectAll();
+            element.classList.add('selected');
+            selectedElement = element;
+            
+            // Asegurar que está encima de todo al seleccionar
+            element.style.zIndex = zIndexCounter++;
+            element.parentNode.appendChild(element);
+            
+            document.getElementById('editPanel').classList.add('visible');
+            updateUI();
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.element').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedElement = null;
+            document.getElementById('editPanel').classList.remove('visible');
+            updateUI();
+        }
+
+        function showPropsModal() {
+            if (!selectedElement) return;
+            
+            const modal = document.getElementById('propsModal');
+            const content = document.getElementById('propsContent');
+            const type = selectedElement.dataset.type;
+            
+            const currentBgColor = selectedElement.style.backgroundColor || '#ffffff';
+            const currentBgOpacity = getBackgroundOpacity(selectedElement);
+            const currentOpacity = selectedElement.style.opacity || 1;
+            const currentBorderWidth = parseInt(selectedElement.style.borderWidth) || 0;
+            const currentBorderColor = selectedElement.style.borderColor || '#000000';
+            
+            let html = '';
+            
+            // Contenido de la pestaña Estilo
+            html += `
+                <div class="tab-content active" data-tab-content="style">
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label>Opacidad</label>
+                            <input type="range" id="propOpacity" min="0" max="1" step="0.1" value="${currentOpacity}">
+                            <span class="range-value">${Math.round(currentOpacity * 100)}%</span>
+                        </div>
+                        <div class="form-row">
+                            <label>Color fondo</label>
+                            <input type="color" id="propBgColor" value="${hexFromRgba(currentBgColor)}">
+                        </div>
+                        <div class="form-row">
+                            <label>Opacidad fondo</label>
+                            <input type="range" id="propBgOpacity" min="0" max="1" step="0.1" value="${currentBgOpacity}">
+                            <span class="range-value">${Math.round(currentBgOpacity * 100)}%</span>
+                        </div>
+                        <div class="form-row">
+                            <label>Borde (px)</label>
+                            <input type="number" id="propBorder" value="${currentBorderWidth}" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Color borde</label>
+                            <input type="color" id="propBorderColor" value="${currentBorderColor}">
+                        </div>
+            `;
+            
+            if (type === 'text') {
+                const textContent = selectedElement.querySelector('.text-content');
+                // Determinar la fuente actual
+                let currentFont = 'font-arial';
+                availableFonts.forEach(font => {
+                    if (textContent.classList.contains(font.value)) {
+                        currentFont = font.value;
+                    }
+                });
+                
+                // Determinar el estilo actual
+                let currentFontStyle = 'normal';
+                if (textContent.style.fontWeight === 'bold' && textContent.style.fontStyle === 'italic') {
+                    currentFontStyle = 'bold italic';
+                } else if (textContent.style.fontWeight === 'bold') {
+                    currentFontStyle = 'bold';
+                } else if (textContent.style.fontStyle === 'italic') {
+                    currentFontStyle = 'italic';
+                }
+                
+                html += `
+                        <div class="form-row">
+                            <label>Color texto</label>
+                            <input type="color" id="propColor" value="${textContent.style.color || '#000000'}">
+                        </div>
+                        <div class="form-row">
+                            <label>Tamaño texto</label>
+                            <input type="number" id="propFontSize" value="${parseInt(textContent.style.fontSize) || 14}">
+                        </div>
+                        <div class="form-row">
+                            <label>Fuente</label>
+                            <select id="propFontFamily">
+                                ${availableFonts.map(font => 
+                                    `<option value="${font.value}" ${font.value === currentFont ? 'selected' : ''}>${font.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>Alineación</label>
+                            <select id="propTextAlign">
+                                <option value="left" ${textContent.style.textAlign === 'left' ? 'selected' : ''}>Izquierda</option>
+                                <option value="center" ${textContent.style.textAlign === 'center' ? 'selected' : ''}>Centro</option>
+                                <option value="right" ${textContent.style.textAlign === 'right' ? 'selected' : ''}>Derecha</option>
+                                <option value="justify" ${textContent.style.textAlign === 'justify' ? 'selected' : ''}>Justificado</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>Estilo</label>
+                            <select id="propFontWeight">
+                                <option value="normal" ${currentFontStyle === 'normal' ? 'selected' : ''}>Normal</option>
+                                <option value="bold" ${currentFontStyle === 'bold' ? 'selected' : ''}>Negrita</option>
+                                <option value="italic" ${currentFontStyle === 'italic' ? 'selected' : ''}>Itálica</option>
+                                <option value="bold italic" ${currentFontStyle === 'bold italic' ? 'selected' : ''}>Negrita e itálica</option>
+                            </select>
+                        </div>
+                `;
+            } 
+            else if (type === 'image') {
+                html += `
+                        <div class="form-row">
+                            <label>Modo imagen</label>
+                            <select id="propObjectFit">
+                                <option value="contain" ${selectedElement.querySelector('img')?.style.objectFit === 'contain' ? 'selected' : ''}>Contener</option>
+                                <option value="cover" ${selectedElement.querySelector('img')?.style.objectFit === 'cover' ? 'selected' : ''}>Cubrir</option>
+                                <option value="fill" ${selectedElement.querySelector('img')?.style.objectFit === 'fill' ? 'selected' : ''}>Rellenar</option>
+                            </select>
+                        </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="tab-content" data-tab-content="content">
+                    <div class="form-grid">
+            `;
+            
+            if (type === 'text') {
+                const textContent = selectedElement.querySelector('.text-content');
+                html += `
+                        <div class="form-row" style="grid-column: span 2;">
+                            <label>Contenido</label>
+                            <textarea id="propTextContent" rows="6" style="width: 100%;">${textContent.textContent}</textarea>
+                        </div>
+                `;
+            } 
+            else if (type === 'image') {
+                html += `
+                        <div class="form-row" style="grid-column: span 2;">
+                            <button id="changeImageBtn" class="btn" style="width: 100%;">Cambiar imagen</button>
+                        </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="tab-content" data-tab-content="filters">
+                    <div class="form-grid">
+            `;
+            
+            if (type === 'image') {
+                const currentFilter = selectedElement.dataset.filter || 'none';
+                html += `
+                        <div class="form-row">
+                            <button class="btn ${currentFilter === 'none' ? 'btn-primary' : ''}" data-filter="none">Normal</button>
+                        </div>
+                        <div class="form-row">
+                            <button class="btn ${currentFilter === 'grayscale' ? 'btn-primary' : ''}" data-filter="grayscale">Blanco y negro</button>
+                        </div>
+                        <div class="form-row">
+                            <button class="btn ${currentFilter === 'sepia' ? 'btn-primary' : ''}" data-filter="sepia">Sepia</button>
+                        </div>
+                        <div class="form-row">
+                            <button class="btn ${currentFilter === 'invert' ? 'btn-primary' : ''}" data-filter="invert">Invertir</button>
+                        </div>
+                        <div class="form-row">
+                            <button class="btn ${currentFilter === 'saturate' ? 'btn-primary' : ''}" data-filter="saturate">Saturar</button>
+                        </div>
+                `;
+            } else {
+                html += `
+                        <div class="form-row" style="grid-column: span 2;">
+                            <p style="text-align: center; color: #777; font-size: 12px;">Los filtros solo están disponibles para imágenes</p>
+                        </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            content.innerHTML = html;
+            
+            // Restablecer las pestañas activas
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.tab-button[data-tab="style"]').classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelector('.tab-content[data-tab-content="style"]').classList.add('active');
+            
+            // Event listeners para los controles de rango
+            document.getElementById('propOpacity').addEventListener('input', (e) => {
+                e.target.nextElementSibling.textContent = `${Math.round(e.target.value * 100)}%`;
+                selectedElement.style.opacity = e.target.value;
+            });
+            
+            document.getElementById('propBgOpacity').addEventListener('input', (e) => {
+                e.target.nextElementSibling.textContent = `${Math.round(e.target.value * 100)}%`;
+                const bgColor = document.getElementById('propBgColor').value;
+                selectedElement.style.backgroundColor = hexToRgba(bgColor, e.target.value);
+            });
+            
+            document.getElementById('propBgColor').addEventListener('input', (e) => {
+                const bgOpacity = document.getElementById('propBgOpacity').value;
+                selectedElement.style.backgroundColor = hexToRgba(e.target.value, bgOpacity);
+            });
+            
+            document.getElementById('propBorder').addEventListener('input', (e) => {
+                const borderColor = document.getElementById('propBorderColor').value;
+                if (e.target.value > 0) {
+                    selectedElement.style.border = `${e.target.value}px solid ${borderColor}`;
+                    selectedElement.dataset.hasBorder = "true";
+                } else {
+                    selectedElement.style.border = 'none';
+                    selectedElement.dataset.hasBorder = "false";
+                }
+            });
+            
+            document.getElementById('propBorderColor').addEventListener('input', (e) => {
+                const borderWidth = document.getElementById('propBorder').value;
+                if (borderWidth > 0) {
+                    selectedElement.style.border = `${borderWidth}px solid ${e.target.value}`;
+                }
+            });
+            
+            // Event listeners para propiedades de texto
+            if (type === 'text') {
+                const textContent = selectedElement.querySelector('.text-content');
+                
+                document.getElementById('propColor').addEventListener('input', (e) => {
+                    textContent.style.color = e.target.value;
+                });
+                
+                document.getElementById('propFontSize').addEventListener('input', (e) => {
+                    textContent.style.fontSize = `${e.target.value}px`;
+                });
+                
+                document.getElementById('propFontFamily').addEventListener('change', (e) => {
+                    // Eliminar todas las clases de fuente primero
+                    availableFonts.forEach(font => {
+                        textContent.classList.remove(font.value);
+                    });
+                    
+                    // Añadir la nueva clase de fuente
+                    textContent.classList.add(e.target.value);
+                });
+                
+                document.getElementById('propTextAlign').addEventListener('change', (e) => {
+                    textContent.style.textAlign = e.target.value;
+                });
+                
+                document.getElementById('propFontWeight').addEventListener('change', (e) => {
+                    const styles = e.target.value.split(' ');
+                    textContent.style.fontWeight = styles.includes('bold') ? 'bold' : 'normal';
+                    textContent.style.fontStyle = styles.includes('italic') ? 'italic' : 'normal';
+                });
+                
+                document.getElementById('propTextContent').addEventListener('input', (e) => {
+                    textContent.textContent = e.target.value;
+                });
+            }
+            
+            // Event listeners para propiedades de imagen
+            if (type === 'image') {
+                document.getElementById('propObjectFit').addEventListener('change', (e) => {
+                    const img = selectedElement.querySelector('img');
+                    if (img) img.style.objectFit = e.target.value;
+                });
+                
+                // Botón para cambiar imagen
+                document.getElementById('changeImageBtn').addEventListener('click', () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    
+                    input.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = selectedElement.querySelector('img');
+                            if (img) img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                    
+                    input.click();
+                });
+                
+                // Filtros de imagen
+                document.querySelectorAll('[data-filter]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const filter = btn.dataset.filter;
+                        
+                        // Quitar todas las clases de filtro
+                        selectedElement.classList.remove('filter-grayscale', 'filter-sepia', 'filter-invert', 'filter-saturate', 'filter-none');
+                        
+                        if (filter !== 'none') {
+                            selectedElement.classList.add(`filter-${filter}`);
+                        }
+                        
+                        selectedElement.dataset.filter = filter;
+                        
+                        // Actualizar estilos de botones
+                        document.querySelectorAll('[data-filter]').forEach(b => {
+                            b.classList.remove('btn-primary');
+                            if (b.dataset.filter === filter) {
+                                b.classList.add('btn-primary');
+                            }
+                        });
+                    });
+                });
+            }
+            
+            modal.classList.add('active');
+        }
+
+        function getBackgroundOpacity(element) {
+            const bgColor = element.style.backgroundColor;
+            if (!bgColor || !bgColor.includes('rgba')) return 1;
+            
+            const match = bgColor.match(/rgba\(.*,\s*([\d.]+)\)/);
+            return match ? parseFloat(match[1]) : 1;
+        }
+
+        function hexFromRgba(rgba) {
+            if (!rgba) return '#ffffff';
+            if (rgba.startsWith('#')) return rgba;
+            
+            const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+            if (!match) return '#ffffff';
+            
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            
+            return `#${r}${g}${b}`;
+        }
+
+        function hidePropsModal() {
+            document.getElementById('propsModal').classList.remove('active');
+        }
+
+        function saveProps() {
+            if (!selectedElement) return;
+            
+            // Las propiedades ya se han aplicado en tiempo real, solo necesitamos cerrar el modal
+            hidePropsModal();
+        }
+
+        function hexToRgba(hex, opacity) {
+            let r = 0, g = 0, b = 0;
+            
+            if (hex.length === 4) {
+                r = parseInt(hex[1] + hex[1], 16);
+                g = parseInt(hex[2] + hex[2], 16);
+                b = parseInt(hex[3] + hex[3], 16);
+            }
+            else if (hex.length === 7) {
+                r = parseInt(hex[1] + hex[2], 16);
+                g = parseInt(hex[3] + hex[4], 16);
+                b = parseInt(hex[5] + hex[6], 16);
+            }
+            
+            return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+        }
+
+        function bringForward() {
+            if (!selectedElement) return;
+            
+            // Incrementamos el z-index para asegurar que queda por encima
+            selectedElement.style.zIndex = zIndexCounter++;
+            
+            // Movemos el elemento al final de su contenedor (mayor orden de apilamiento)
+            selectedElement.parentNode.appendChild(selectedElement);
+        }
+
+        function sendBackward() {
+            if (!selectedElement) return;
+            
+            const siblings = Array.from(selectedElement.parentNode.children)
+                         .filter(el => el.classList.contains('element'));
+            const currentIndex = siblings.indexOf(selectedElement);
+            
+            if (currentIndex > 0) {
+                // Disminuimos el z-index
+                const newZ = parseInt(siblings[currentIndex - 1].style.zIndex || 0);
+                selectedElement.style.zIndex = newZ;
+                
+                // Movemos el elemento antes de su hermano anterior
+                siblings[currentIndex - 1].before(selectedElement);
+            }
+        }
+
+        function togglePinElement() {
+            if (!selectedElement) return;
+            
+            selectedElement.classList.toggle('pinned');
+            updateUI();
+        }
+
+        function duplicateElement() {
+            if (!selectedElement) return;
+            
+            const clone = selectedElement.cloneNode(true);
+            clone.style.left = (parseInt(selectedElement.style.left) + 20) + 'px';
+            clone.style.top = (parseInt(selectedElement.style.top) + 20) + 'px';
+            clone.style.zIndex = zIndexCounter++;
+            clone.classList.remove('selected', 'pinned');
+            
+            const oldHandles = clone.querySelectorAll('.handle');
+            oldHandles.forEach(h => h.remove());
+            setupElement(clone);
+            
+            // Si es una imagen, clonar también el filtro
+            if (clone.dataset.type === 'image') {
+                clone.dataset.filter = selectedElement.dataset.filter;
+                clone.className = selectedElement.className.replace('selected', '').replace('pinned', '');
+                clone.classList.add(`filter-${selectedElement.dataset.filter}`);
+            }
+            
+            // Si es texto, clonar también la clase de fuente
+            if (clone.dataset.type === 'text') {
+                const originalText = selectedElement.querySelector('.text-content');
+                const clonedText = clone.querySelector('.text-content');
+                
+                // Eliminar cualquier clase de fuente existente
+                availableFonts.forEach(font => {
+                    clonedText.classList.remove(font.value);
+                });
+                
+                // Añadir la misma clase de fuente que el original
+                availableFonts.forEach(font => {
+                    if (originalText.classList.contains(font.value)) {
+                        clonedText.classList.add(font.value);
+                    }
+                });
+            }
+            
+            getCurrentPageElement().appendChild(clone);
+            selectElement(clone);
+        }
+
+        function deleteSelected() {
+            if (!selectedElement) return;
+            if (confirm("¿Eliminar este elemento?")) {
+                selectedElement.remove();
+                deselectAll();
+            }
+        }
+
+        function copyCurrentPage() {
+            if (currentProject.currentPageIndex < 0 || currentProject.currentPageIndex >= currentProject.pages.length) return;
+            
+            // Copiar la estructura de la página actual
+            copiedPageIndex = currentProject.currentPageIndex;
+            const pageData = currentProject.pages[copiedPageIndex];
+            
+            // Copiar todos los elementos de la página
+            copiedPage = {
+                id: `page-copy-${Date.now()}`,
+                elements: []
+            };
+            
+            const pageElement = document.getElementById(pageData.id);
+            if (!pageElement) return;
+            
+            pageElement.querySelectorAll('.element').forEach(element => {
+                const elementData = {
+                    type: element.dataset.type,
+                    left: element.style.left,
+                    top: element.style.top,
+                    width: element.style.width,
+                    height: element.style.height,
+                    rotation: element.dataset.rotation || '0',
+                    zIndex: element.style.zIndex,
+                    backgroundColor: element.style.backgroundColor,
+                    opacity: element.style.opacity,
+                    border: element.style.border,
+                    hasBorder: element.dataset.hasBorder,
+                    isPinned: element.classList.contains('pinned'),
+                    filter: element.dataset.filter || 'none'
+                };
+                
+                if (elementData.type === 'text') {
+                    const textContent = element.querySelector('.text-content');
+                    elementData.content = textContent.textContent;
+                    elementData.color = textContent.style.color;
+                    elementData.fontSize = textContent.style.fontSize;
+                    elementData.textAlign = textContent.style.textAlign;
+                    elementData.fontWeight = textContent.style.fontWeight;
+                    elementData.fontStyle = textContent.style.fontStyle;
+                    
+                    availableFonts.forEach(font => {
+                        if (textContent.classList.contains(font.value)) {
+                            elementData.fontFamily = font.value;
+                        }
+                    });
+                } else if (elementData.type === 'image') {
+                    const img = element.querySelector('img');
+                    elementData.src = img?.src || '';
+                    elementData.objectFit = img?.style.objectFit || 'contain';
+                }
+                
+                copiedPage.elements.push(elementData);
+            });
+            
+            // Habilitar el botón de pegar
+            document.getElementById('pastePageBtn').disabled = false;
+            alert(`Página ${copiedPageIndex + 1} copiada. Selecciona dónde quieres pegarla.`);
+        }
+
+        function pastePage() {
+            if (!copiedPage) return;
+            
+            // Crear nueva página después de la actual
+            const newPageIndex = currentProject.currentPageIndex + 1;
+            const newPageId = `page-${Date.now()}`;
+            
+            // Insertar en el array de páginas
+            currentProject.pages.splice(newPageIndex, 0, {
+                id: newPageId,
+                elements: []
+            });
+            
+            // Crear elemento DOM para la nueva página
+            const pageElement = document.createElement('div');
+            pageElement.className = 'page page-view';
+            pageElement.id = newPageId;
+            pageElement.dataset.pageIndex = newPageIndex;
+            
+            const mmToPx = 3.78;
+            pageElement.style.width = `${210 * mmToPx}px`;
+            pageElement.style.height = `${297 * mmToPx}px`;
+            
+            // Insertar en el DOM después de la página actual
+            const pagesContainer = document.getElementById('pagesContainer');
+            const currentPageElement = document.querySelector('.page.active');
+            if (currentPageElement) {
+                currentPageElement.after(pageElement);
+            } else {
+                pagesContainer.appendChild(pageElement);
+            }
+            
+            // Actualizar índices de todas las páginas
+            document.querySelectorAll('.page').forEach((page, index) => {
+                page.dataset.pageIndex = index;
+            });
+            
+            // Copiar todos los elementos a la nueva página
+            copiedPage.elements.forEach(elementData => {
+                const element = document.createElement('div');
+                element.className = 'element';
+                element.style.left = elementData.left;
+                element.style.top = elementData.top;
+                element.style.width = elementData.width;
+                element.style.height = elementData.height;
+                element.style.zIndex = zIndexCounter++;
+                element.style.backgroundColor = elementData.backgroundColor || '';
+                element.style.opacity = elementData.opacity || '1';
+                element.style.transform = `rotate(${elementData.rotation || 0}deg)`;
+                element.dataset.type = elementData.type;
+                element.dataset.rotation = elementData.rotation || '0';
+                element.dataset.hasBorder = elementData.hasBorder || "false";
+                element.dataset.filter = elementData.filter || 'none';
+                
+                if (elementData.isPinned) {
+                    element.classList.add('pinned');
+                }
+                
+                if (elementData.border && elementData.hasBorder === "true") {
+                    element.style.border = elementData.border;
+                }
+                
+                if (elementData.type === 'text') {
+                    const textContent = document.createElement('div');
+                    textContent.className = 'text-content';
+                    textContent.contentEditable = true;
+                    textContent.textContent = elementData.content || "Texto de ejemplo";
+                    textContent.style.color = elementData.color || '#000000';
+                    textContent.style.fontSize = elementData.fontSize || '14px';
+                    textContent.style.textAlign = elementData.textAlign || 'left';
+                    textContent.style.fontWeight = elementData.fontWeight || 'normal';
+                    textContent.style.fontStyle = elementData.fontStyle || 'normal';
+                    
+                    if (elementData.fontFamily) {
+                        textContent.classList.add(elementData.fontFamily);
+                    } else {
+                        textContent.classList.add('font-arial');
+                    }
+                    
+                    element.appendChild(textContent);
+                } else if (elementData.type === 'image') {
+                    element.style.display = 'flex';
+                    element.style.alignItems = 'center';
+                    element.style.justifyContent = 'center';
+                    
+                    const img = document.createElement('img');
+                    img.src = elementData.src || '';
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '100%';
+                    img.style.objectFit = elementData.objectFit || 'contain';
+                    
+                    if (elementData.filter && elementData.filter !== 'none') {
+                        element.classList.add(`filter-${elementData.filter}`);
+                    }
+                    
+                    element.appendChild(img);
+                }
+                
+                setupElement(element);
+                pageElement.appendChild(element);
+            });
+            
+            // Mostrar la nueva página
+            showPage(newPageIndex);
+            alert(`Página pegada como página ${newPageIndex + 1}`);
+        }
+
+        function newProject() {
+            if (confirm("¿Crear un nuevo proyecto? Se perderán los cambios no guardados.")) {
+                document.getElementById('pagesContainer').innerHTML = '';
+                currentProject = {
+                    name: "Nuevo Fanzine",
+                    pages: [{ id: 'page-1', elements: [] }],
+                    currentPageIndex: 0,
+                    showGrid: gridEnabled
+                };
+                document.getElementById('projectName').textContent = currentProject.name;
+                zIndexCounter = 1;
+                copiedPage = null;
+                copiedPageIndex = -1;
+                setupPages();
+            }
+        }
+
+        function saveProject() {
+            const modal = document.getElementById('projectModal');
+            const saveTab = document.querySelector('[data-tab-content="save"]');
+            
+            // Mostrar el modal en la pestaña de guardar
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.tab-button[data-tab="save"]').classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+                if (content.dataset.tabContent === 'save') {
+                    content.classList.add('active');
+                }
+            });
+            
+            // Establecer el nombre actual del proyecto
+            document.getElementById('projectNameInput').value = currentProject.name;
+            modal.classList.add('active');
+            
+            // Enfocar el campo de nombre
+            setTimeout(() => {
+                document.getElementById('projectNameInput').focus();
+            }, 100);
+        }
+
+        function saveProjectToStorage() {
+            const projectName = document.getElementById('projectNameInput').value.trim();
+            if (!projectName) {
+                alert("Por favor ingresa un nombre para el proyecto");
+                return;
+            }
+            
+            // Actualizar el nombre del proyecto actual
+            currentProject.name = projectName;
+            document.getElementById('projectName').textContent = projectName;
+            
+            // Serializar el estado actual del proyecto
+            const projectData = {
+                name: currentProject.name,
+                pages: [],
+                showGrid: gridEnabled
+            };
+            
+            // Recopilar datos de cada página y sus elementos
+            document.querySelectorAll('.page').forEach(pageEl => {
+                const pageData = {
+                    id: pageEl.id,
+                    elements: []
+                };
+                
+                pageEl.querySelectorAll('.element').forEach(element => {
+                    const elementData = {
+                        type: element.dataset.type,
+                        left: element.style.left,
+                        top: element.style.top,
+                        width: element.style.width,
+                        height: element.style.height,
+                        rotation: element.dataset.rotation || '0',
+                        zIndex: element.style.zIndex,
+                        backgroundColor: element.style.backgroundColor,
+                        opacity: element.style.opacity,
+                        border: element.style.border,
+                        hasBorder: element.dataset.hasBorder,
+                        isPinned: element.classList.contains('pinned'),
+                        filter: element.dataset.filter || 'none'
+                    };
+                    
+                    if (elementData.type === 'text') {
+                        const textContent = element.querySelector('.text-content');
+                        elementData.content = textContent.textContent;
+                        elementData.color = textContent.style.color;
+                        elementData.fontSize = textContent.style.fontSize;
+                        elementData.textAlign = textContent.style.textAlign;
+                        elementData.fontWeight = textContent.style.fontWeight;
+                        elementData.fontStyle = textContent.style.fontStyle;
+                        
+                        // Determinar la clase de fuente
+                        availableFonts.forEach(font => {
+                            if (textContent.classList.contains(font.value)) {
+                                elementData.fontFamily = font.value;
+                            }
+                        });
+                    } else if (elementData.type === 'image') {
+                        const img = element.querySelector('img');
+                        elementData.src = img?.src || '';
+                        elementData.objectFit = img?.style.objectFit || 'contain';
+                    }
+                    
+                    pageData.elements.push(elementData);
+                });
+                
+                projectData.pages.push(pageData);
+            });
+            
+            // Guardar en localStorage
+            const savedProjects = JSON.parse(localStorage.getItem('fanzineProjects') || '{}');
+            savedProjects[projectName] = projectData;
+            localStorage.setItem('fanzineProjects', JSON.stringify(savedProjects));
+            
+            // Actualizar la lista de proyectos guardados
+            updateSavedProjectsList();
+            
+            // Cerrar el modal
+            document.getElementById('projectModal').classList.remove('active');
+            
+            alert(`Proyecto "${projectName}" guardado correctamente`);
+        }
+
+        function updateSavedProjectsList() {
+            const savedProjects = JSON.parse(localStorage.getItem('fanzineProjects') || '{}');
+            const projectsList = document.getElementById('savedProjectsList');
+            projectsList.innerHTML = '';
+            
+            if (Object.keys(savedProjects).length === 0) {
+                projectsList.innerHTML = '<p style="text-align: center; color: #777;">No hay proyectos guardados</p>';
+                return;
+            }
+            
+            Object.keys(savedProjects).forEach(projectName => {
+                const projectItem = document.createElement('div');
+                projectItem.className = 'project-item';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = projectName;
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'project-actions';
+                
+                const loadBtn = document.createElement('button');
+                loadBtn.className = 'btn';
+                loadBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
+                loadBtn.title = 'Cargar proyecto';
+                loadBtn.addEventListener('click', () => loadProject(projectName));
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn';
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.title = 'Eliminar proyecto';
+                deleteBtn.addEventListener('click', () => deleteProject(projectName));
+                
+                actionsDiv.appendChild(loadBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                projectItem.appendChild(nameSpan);
+                projectItem.appendChild(actionsDiv);
+                
+                projectsList.appendChild(projectItem);
+            });
+        }
+
+        function loadProject(projectName) {
+            if (confirm(`¿Cargar el proyecto "${projectName}"? Se perderán los cambios no guardados.`)) {
+                const savedProjects = JSON.parse(localStorage.getItem('fanzineProjects') || '{}');
+                const projectData = savedProjects[projectName];
+                
+                if (!projectData) {
+                    alert("Proyecto no encontrado");
+                    return;
+                }
+                
+                // Limpiar el editor actual
+                document.getElementById('pagesContainer').innerHTML = '';
+                currentProject = {
+                    name: projectName,
+                    pages: [],
+                    currentPageIndex: 0,
+                    showGrid: projectData.showGrid || false
+                };
+                
+                document.getElementById('projectName').textContent = projectName;
+                
+                // Restaurar páginas y elementos
+                projectData.pages.forEach((pageData, index) => {
+                    const pageElement = document.createElement('div');
+                    pageElement.className = 'page page-view';
+                    pageElement.id = pageData.id || `page-${Date.now()}`;
+                    pageElement.dataset.pageIndex = index;
+                    
+                    const mmToPx = 3.78;
+                    pageElement.style.width = `${210 * mmToPx}px`;
+                    pageElement.style.height = `${297 * mmToPx}px`;
+                    
+                    document.getElementById('pagesContainer').appendChild(pageElement);
+                    
+                    // Agregar al objeto currentProject
+                    currentProject.pages.push({
+                        id: pageElement.id,
+                        elements: []
+                    });
+                    
+                    // Restaurar elementos
+                    pageData.elements.forEach(elementData => {
+                        const element = document.createElement('div');
+                        element.className = 'element';
+                        element.style.left = elementData.left;
+                        element.style.top = elementData.top;
+                        element.style.width = elementData.width;
+                        element.style.height = elementData.height;
+                        element.style.zIndex = elementData.zIndex || zIndexCounter++;
+                        element.style.backgroundColor = elementData.backgroundColor || '';
+                        element.style.opacity = elementData.opacity || '1';
+                        element.style.transform = `rotate(${elementData.rotation || 0}deg)`;
+                        element.dataset.type = elementData.type;
+                        element.dataset.rotation = elementData.rotation || '0';
+                        element.dataset.hasBorder = elementData.hasBorder || "false";
+                        element.dataset.filter = elementData.filter || 'none';
+                        
+                        if (elementData.isPinned) {
+                            element.classList.add('pinned');
+                        }
+                        
+                        if (elementData.border && elementData.hasBorder === "true") {
+                            element.style.border = elementData.border;
+                        }
+                        
+                        if (elementData.type === 'text') {
+                            const textContent = document.createElement('div');
+                            textContent.className = 'text-content';
+                            textContent.contentEditable = true;
+                            textContent.textContent = elementData.content || "Texto de ejemplo";
+                            textContent.style.color = elementData.color || '#000000';
+                            textContent.style.fontSize = elementData.fontSize || '14px';
+                            textContent.style.textAlign = elementData.textAlign || 'left';
+                            textContent.style.fontWeight = elementData.fontWeight || 'normal';
+                            textContent.style.fontStyle = elementData.fontStyle || 'normal';
+                            
+                            // Aplicar la familia de fuentes
+                            if (elementData.fontFamily) {
+                                textContent.classList.add(elementData.fontFamily);
+                            } else {
+                                textContent.classList.add('font-arial');
+                            }
+                            
+                            element.appendChild(textContent);
+                        } else if (elementData.type === 'image') {
+                            element.style.display = 'flex';
+                            element.style.alignItems = 'center';
+                            element.style.justifyContent = 'center';
+                            
+                            const img = document.createElement('img');
+                            img.src = elementData.src || '';
+                            img.style.maxWidth = '100%';
+                            img.style.maxHeight = '100%';
+                            img.style.objectFit = elementData.objectFit || 'contain';
+                            
+                            // Aplicar filtro si existe
+                            if (elementData.filter && elementData.filter !== 'none') {
+                                element.classList.add(`filter-${elementData.filter}`);
+                            }
+                            
+                            element.appendChild(img);
+                        }
+                        
+                        setupElement(element);
+                        pageElement.appendChild(element);
+                    });
+                });
+                
+                // Mostrar la primera página
+                showPage(0);
+                updateGrid();
+                updatePageIndicator();
+                
+                // Cerrar el modal
+                document.getElementById('projectModal').classList.remove('active');
+            }
+        }
+
+        function deleteProject(projectName) {
+            if (confirm(`¿Eliminar permanentemente el proyecto "${projectName}"?`)) {
+                const savedProjects = JSON.parse(localStorage.getItem('fanzineProjects') || '{}');
+                delete savedProjects[projectName];
+                localStorage.setItem('fanzineProjects', JSON.stringify(savedProjects));
+                updateSavedProjectsList();
+            }
+        }
+
+        async function exportToPDF() {
+            const projectName = prompt("Nombre del archivo PDF:", currentProject.name) || currentProject.name;
+            if (!projectName) return;
+            
+            const loadingMsg = document.createElement('div');
+            loadingMsg.style.position = 'fixed';
+            loadingMsg.style.top = '50%';
+            loadingMsg.style.left = '50%';
+            loadingMsg.style.transform = 'translate(-50%, -50%)';
+            loadingMsg.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            loadingMsg.style.color = 'white';
+            loadingMsg.style.padding = '20px';
+            loadingMsg.style.borderRadius = '5px';
+            loadingMsg.style.zIndex = '10000';
+            loadingMsg.textContent = 'Generando PDF...';
+            document.body.appendChild(loadingMsg);
+
+            try {
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // Función para aplicar filtros directamente al canvas
+                const applyFilterToCanvas = (canvas, filterType) => {
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    switch(filterType) {
+                        case 'grayscale':
+                            for (let i = 0; i < data.length; i += 4) {
+                                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                data[i] = avg;     // R
+                                data[i + 1] = avg; // G
+                                data[i + 2] = avg; // B
+                            }
+                            break;
+                        case 'sepia':
+                            for (let i = 0; i < data.length; i += 4) {
+                                const r = data[i];
+                                const g = data[i + 1];
+                                const b = data[i + 2];
+                                data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
+                                data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
+                                data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
+                            }
+                            break;
+                        case 'invert':
+                            for (let i = 0; i < data.length; i += 4) {
+                                data[i] = 255 - data[i];         // R
+                                data[i + 1] = 255 - data[i + 1]; // G
+                                data[i + 2] = 255 - data[i + 2]; // B
+                            }
+                            break;
+                        case 'saturate':
+                            // Implementación básica de saturación
+                            for (let i = 0; i < data.length; i += 4) {
+                                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                data[i] = avg + (data[i] - avg) * 2;     // R
+                                data[i + 1] = avg + (data[i + 1] - avg) * 2; // G
+                                data[i + 2] = avg + (data[i + 2] - avg) * 2; // B
+                            }
+                            break;
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    return canvas;
+                };
+
+                // Exportar cada página
+                for (let i = 0; i < currentProject.pages.length; i++) {
+                    if (i > 0) pdf.addPage();
+                    
+                    const pageElement = document.getElementById(currentProject.pages[i].id);
+                    if (!pageElement) continue;
+                    
+                    // Crear un contenedor temporal para la página
+                    const tempContainer = document.createElement('div');
+                    tempContainer.style.position = 'absolute';
+                    tempContainer.style.left = '-9999px';
+                    tempContainer.style.width = pageElement.style.width;
+                    tempContainer.style.height = pageElement.style.height;
+                    tempContainer.style.backgroundColor = 'white';
+                    
+                    // Clonar todos los elementos de la página
+                    const elements = pageElement.querySelectorAll('.element');
+                    const imageProcessingPromises = [];
+                    
+                    for (const element of elements) {
+                        const clone = element.cloneNode(true);
+                        
+                        // Eliminar las clases que causan el marco verde
+                        clone.classList.remove('selected', 'pinned');
+                        
+                        // Eliminar los handles de los clones
+                        const handles = clone.querySelectorAll('.handle');
+                        handles.forEach(handle => handle.remove());
+                        
+                        // Asegurar que la rotación se aplica
+                        const rotation = element.dataset.rotation || 0;
+                        clone.style.transform = `rotate(${rotation}deg)`;
+                        
+                        // Procesar imágenes con filtros
+                        if (clone.dataset.type === 'image' && clone.dataset.filter && clone.dataset.filter !== 'none') {
+                            const img = clone.querySelector('img');
+                            if (img) {
+                                // Crear un canvas para procesar la imagen
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                
+                                const promise = new Promise((resolve) => {
+                                    img.onload = () => {
+                                        canvas.width = img.naturalWidth;
+                                        canvas.height = img.naturalHeight;
+                                        ctx.drawImage(img, 0, 0);
+                                        
+                                        // Aplicar el filtro directamente al canvas
+                                        applyFilterToCanvas(canvas, clone.dataset.filter);
+                                        
+                                        // Reemplazar la imagen original por la procesada
+                                        img.src = canvas.toDataURL('image/jpeg');
+                                        resolve();
+                                    };
+                                    
+                                    // Asegurar que se dispare el onload si la imagen ya está cargada
+                                    if (img.complete) {
+                                        img.onload = null;
+                                        canvas.width = img.naturalWidth;
+                                        canvas.height = img.naturalHeight;
+                                        ctx.drawImage(img, 0, 0);
+                                        
+                                        applyFilterToCanvas(canvas, clone.dataset.filter);
+                                        img.src = canvas.toDataURL('image/jpeg');
+                                        resolve();
+                                    }
+                                });
+                                
+                                imageProcessingPromises.push(promise);
+                            }
+                        }
+                        
+                        // Procesar texto
+                        if (clone.dataset.type === 'text') {
+                            const originalText = element.querySelector('.text-content');
+                            const clonedText = clone.querySelector('.text-content');
+                            
+                            // Eliminar cualquier clase de fuente existente
+                            availableFonts.forEach(font => {
+                                clonedText.classList.remove(font.value);
+                            });
+                            
+                            // Añadir la misma clase de fuente que el original
+                            availableFonts.forEach(font => {
+                                if (originalText.classList.contains(font.value)) {
+                                    clonedText.classList.add(font.value);
+                                }
+                            });
+                        }
+                        
+                        tempContainer.appendChild(clone);
+                    }
+                    
+                    document.body.appendChild(tempContainer);
+                    
+                    // Esperar a que todas las imágenes se procesen
+                    await Promise.all(imageProcessingPromises);
+                    
+                    // Configuración de html2canvas
+                    const options = {
+                        scale: 2,
+                        logging: false,
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#FFFFFF',
+                        scrollX: 0,
+                        scrollY: 0,
+                        windowWidth: parseInt(pageElement.style.width),
+                        windowHeight: parseInt(pageElement.style.height)
+                    };
+                    
+                    // Convertir a canvas
+                    const canvas = await html2canvas(tempContainer, options);
+                    
+                    // Eliminar el contenedor temporal
+                    document.body.removeChild(tempContainer);
+                    
+                    // Añadir al PDF
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const imgWidth = 210; // Ancho DIN A4 en mm
+                    const imgHeight = (canvas.height * 210) / canvas.width;
+                    
+                    // Centrar verticalmente
+                    const yPos = (297 - imgHeight) / 2;
+                    
+                    pdf.addImage(imgData, 'JPEG', 0, yPos, imgWidth, imgHeight);
+                }
+                
+                document.body.removeChild(loadingMsg);
+                pdf.save(`${projectName}.pdf`);
+                
+            } catch (error) {
+                console.error("Error al exportar:", error);
+                document.body.removeChild(loadingMsg);
+                alert("Error al generar el PDF: " + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
